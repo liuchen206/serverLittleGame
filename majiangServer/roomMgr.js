@@ -269,3 +269,28 @@ exports.getUserRoom = function (userId) {
     }
     return null;
 };
+exports.isCreator = function (roomId, userId) {
+    var roomInfo = rooms[roomId];
+    if (roomInfo == null) {
+        return false;
+    }
+    return roomInfo.conf.creator == userId;
+};
+exports.destroy = function (roomId) {
+    var roomInfo = rooms[roomId];
+    if (roomInfo == null) {
+        return;
+    }
+
+    for (var i = 0; i < 4; ++i) {
+        var userId = roomInfo.seats[i].userId;
+        if (userId > 0) {
+            delete userLocation[userId];
+            db.set_room_id_of_user(userId, null);
+        }
+    }
+
+    delete rooms[roomId];
+    totalRooms--;
+    db.delete_room(roomId);
+};
