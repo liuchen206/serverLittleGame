@@ -53,7 +53,29 @@ exports.get_user_data = function (account, callback) {
         callback(rows[0]);
     });
 };
-
+exports.create_user = function (account, name, coins, gems, sex, headimg, callback) {
+    callback = callback == null ? nop : callback;
+    if (account == null || name == null || coins == null || gems == null) {
+        callback(false);
+        return;
+    }
+    if (headimg) {
+        headimg = '"' + headimg + '"';
+    }
+    else {
+        headimg = 'null';
+    }
+    name = crypto.toBase64(name);
+    var sql = 'INSERT INTO t_users(account,name,coins,gems,sex,headimg) VALUES("{0}","{1}",{2},{3},{4},{5})';
+    sql = sql.format(account, name, coins, gems, sex, headimg);
+    console.log(sql);
+    query(sql, function (err, rows, fields) {
+        if (err) {
+            throw err;
+        }
+        callback(true);
+    });
+};
 exports.get_room_id_of_user = function (userId, callback) {
     callback = callback == null ? nop : callback;
     var sql = 'SELECT roomid FROM t_users WHERE userid = "' + userId + '"';
@@ -94,30 +116,6 @@ exports.is_user_exist = function (account, callback) {
         callback(true);
     });
 }
-
-exports.create_user = function (account, name, coins, gems, sex, headimg, callback) {
-    callback = callback == null ? nop : callback;
-    if (account == null || name == null || coins == null || gems == null) {
-        callback(false);
-        return;
-    }
-    if (headimg) {
-        headimg = '"' + headimg + '"';
-    }
-    else {
-        headimg = 'null';
-    }
-    name = crypto.toBase64(name);
-    var sql = 'INSERT INTO t_users(account,name,coins,gems,sex,headimg) VALUES("{0}","{1}",{2},{3},{4},{5})';
-    sql = sql.format(account, name, coins, gems, sex, headimg);
-    console.log(sql);
-    query(sql, function (err, rows, fields) {
-        if (err) {
-            throw err;
-        }
-        callback(true);
-    });
-};
 
 exports.get_gems = function (account, callback) {
     callback = callback == null ? nop : callback;

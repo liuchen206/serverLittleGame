@@ -128,7 +128,6 @@ app.get('/create_private_room', function (req, res) {
         return;
     }
     var account = data.account;
-
     data.account = null;
     data.sign = null;
     var conf = data.conf;
@@ -147,7 +146,7 @@ app.get('/create_private_room', function (req, res) {
                 return;
             }
             //创建房间
-            console.log("创建房间.");
+            console.log("创建房间.", conf);
             room_service.createRoom(account, userId, conf, function (err, roomId) {
                 if (err == 0 && roomId != null) {
                     console.log("创建房间,返回成功.");
@@ -176,45 +175,45 @@ app.get('/create_private_room', function (req, res) {
     });
 });
 
-app.get('/enter_private_room',function(req,res){
-	var data = req.query;
-	var roomId = data.roomid;
-	if(roomId == null){
-		http.send(res,-1,"parameters don't match api requirements.");
-		return;
-	}
-	if(!check_account(req,res)){
-		return;
-	}
+app.get('/enter_private_room', function (req, res) {
+    var data = req.query;
+    var roomId = data.roomid;
+    if (roomId == null) {
+        http.send(res, -1, "parameters don't match api requirements.");
+        return;
+    }
+    if (!check_account(req, res)) {
+        return;
+    }
 
-	var account = data.account;
+    var account = data.account;
 
-	db.get_user_data(account,function(data){
-		if(data == null){
-			http.send(res,-1,"system error");
-			return;
-		}
-		var userId = data.userid;
-		var name = data.name;
+    db.get_user_data(account, function (data) {
+        if (data == null) {
+            http.send(res, -1, "system error");
+            return;
+        }
+        var userId = data.userid;
+        var name = data.name;
 
-		//验证玩家状态
-		//todo
-		//进入房间
-		room_service.enterRoom(userId,name,roomId,function(errcode,enterInfo){
-			if(enterInfo){
-				var ret = {
-					roomid:roomId,
-					ip:enterInfo.ip,
-					port:enterInfo.port,
-					token:enterInfo.token,
-					time:Date.now()
-				};
-				ret.sign = crypto.md5(roomId + ret.token + ret.time + config.ROOM_PRI_KEY);
-				http.send(res,0,"ok",ret);
-			}
-			else{
-				http.send(res,errcode,"enter room failed.");
-			}
-		});
-	});
+        //验证玩家状态
+        //todo
+        //进入房间
+        room_service.enterRoom(userId, name, roomId, function (errcode, enterInfo) {
+            if (enterInfo) {
+                var ret = {
+                    roomid: roomId,
+                    ip: enterInfo.ip,
+                    port: enterInfo.port,
+                    token: enterInfo.token,
+                    time: Date.now()
+                };
+                ret.sign = crypto.md5(roomId + ret.token + ret.time + config.ROOM_PRI_KEY);
+                http.send(res, 0, "ok", ret);
+            }
+            else {
+                http.send(res, errcode, "enter room failed.");
+            }
+        });
+    });
 });

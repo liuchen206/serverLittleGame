@@ -128,6 +128,7 @@ app.get('/create_room', function (req, res) {
         }
     });
 });
+
 app.get('/is_room_runing', function (req, res) {
     var roomId = req.query.roomid;
     var sign = req.query.sign;
@@ -142,9 +143,8 @@ app.get('/is_room_runing', function (req, res) {
         return;
     }
 
-    //var roomInfo = roomMgr.getRoom(roomId);
     http.send(res, 0, "ok", { runing: true });
-    console.log("房间是否running检测成功");
+    console.log("房间是running,检测成功");
 });
 
 app.get('/enter_room', function (req, res) {

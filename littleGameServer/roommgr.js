@@ -1,3 +1,6 @@
+/**
+ * 维护了所有房间信息
+ */
 var db = require('../utils/db');
 
 var rooms = {};
@@ -31,10 +34,10 @@ function constructRoomFromDb(dbdata) {
 
 
     if (roomInfo.conf.type == "xlch") {
-        roomInfo.gameMgr = require("./gamemgr_xlch");
+        roomInfo.gameMgr = require("./gamemgr_first");
     }
     else {
-        roomInfo.gameMgr = require("./gamemgr_xzdd");
+        roomInfo.gameMgr = require("./gamemgr_first");
     }
     var roomId = roomInfo.id;
 
@@ -156,10 +159,10 @@ exports.createRoom = function (creator, roomConf, gems, ip, port, callback) {
                     };
 
                     if (roomConf.type == "xlch") {
-                        roomInfo.gameMgr = require("./gamemgr_xlch");
+                        roomInfo.gameMgr = require("./gamemgr_first");
                     }
                     else {
-                        roomInfo.gameMgr = require("./gamemgr_xzdd");
+                        roomInfo.gameMgr = require("./gamemgr_first");
                     }
                     console.log(roomInfo.conf);
 

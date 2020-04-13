@@ -38,12 +38,11 @@ app.get('/register_gs', function (req, res) {
     var httpPort = req.query.httpPort;
     var load = req.query.load;
     var id = clientip + ":" + clientport;
-
+    var serverType = req.query.serverType;
     if (serverMap[id]) {
         var info = serverMap[id];
-        if (info.clientport != clientport || info.httpPort != httpPort || info.ip != ip
-        ) {
-            console.log("duplicate gsid:" + id + ",addr:" + ip + "(" + httpPort + ")");
+        if (info.clientport != clientport || info.httpPort != httpPort || info.ip != ip) {
+            console.log("register_gs 失败 duplicate gsid:" + id + ",addr:" + ip + "(" + httpPort + ")" + "游戏的类型：" + serverType);
             http.send(res, 1, "duplicate gsid:" + id);
             return;
         }
@@ -57,14 +56,16 @@ app.get('/register_gs', function (req, res) {
         clientip: clientip,
         clientport: clientport,
         httpPort: httpPort,
-        load: load
+        load: load,
+        serverType: serverType
     };
     http.send(res, 0, "ok", { ip: ip });
-    console.log("game server registered.\n\tid:" + id + "\n\taddr:" + ip + "\n\thttp port:" + httpPort + "\n\tsocket clientport:" + clientport);
+    console.log("game server registered.\n\tid:" + id + "\n\taddr:" + ip + "\n\thttp port:" + httpPort + "\n\tsocket clientport:" + clientport + " 游戏的类型：" + serverType);
 
     var reqdata = {
         serverid: id,
-        sign: crypto.md5(id + config.ROOM_PRI_KEY)
+        sign: crypto.md5(id + config.ROOM_PRI_KEY),
+        serverType: serverType,
     };
     //获取服务器信息
     http.get(ip, httpPort, "/get_server_info", reqdata, function (ret, data) {
@@ -80,24 +81,30 @@ app.get('/register_gs', function (req, res) {
     });
 });
 
-function chooseServer() {
+function chooseServer(serverType) {
+    console.log("查找类型为", serverType, "的游戏服");
     var serverinfo = null;
     for (var s in serverMap) {
         var info = serverMap[s];
         if (serverinfo == null) {
-            serverinfo = info;
-        }
-        else {
-            if (serverinfo.load > info.load) {
+            if (serverType == info.serverType) {
                 serverinfo = info;
             }
         }
+        else {
+            if (serverType == info.serverType) {
+                if (serverinfo.load > info.load) {
+                    serverinfo = info;
+                }
+            }
+        }
     }
+    if (serverType) console.log("返回类型为", serverinfo.serverType, serverinfo.clientport, "的游戏服");
     return serverinfo;
 }
 
 exports.createRoom = function (account, userId, roomConf, fnCallback) {
-    var serverinfo = chooseServer();
+    var serverinfo = chooseServer(JSON.parse(roomConf).serverType);
     if (serverinfo == null) {
         fnCallback(101, null);
         return;
@@ -141,7 +148,6 @@ exports.enterRoom = function (userId, name, roomId, fnCallback) {
     };
     reqdata.sign = crypto.md5(userId + name + roomId + config.ROOM_PRI_KEY);
 
-    console.log("准备进入房间");
     var checkRoomIsRuning = function (serverinfo, roomId, callback) {
         var sign = crypto.md5(roomId + config.ROOM_PRI_KEY);
         http.get(serverinfo.ip, serverinfo.httpPort, "/is_room_runing", { roomid: roomId, sign: sign }, function (ret, data) {
@@ -184,8 +190,8 @@ exports.enterRoom = function (userId, name, roomId, fnCallback) {
     };
 
     var chooseServerAndEnter = function (serverinfo) {
-        serverinfo = chooseServer();
         console.log("chooseServerAndEnter 选中的服务器", JSON.stringify(serverinfo));
+        serverinfo = chooseServer(serverinfo.serverType);
         if (serverinfo != null) {
             enterRoomReq(serverinfo);
         }
@@ -198,6 +204,10 @@ exports.enterRoom = function (userId, name, roomId, fnCallback) {
         if (ret) {
             var id = ip + ":" + port;
             var serverinfo = serverMap[id];
+            if (ip = '127.0.0.1' && !serverinfo) { // 当使用本地服务器是，注册时使用的 ‘localhost’ 但是创建房间时痛的ip地址段。也就是这里数据库返回的ip字段； 当使用外网时注册和写入数据库的都是ip
+                serverinfo = serverMap['localhost' + ":" + port];
+            }
+            console.log('尝试进入房间', id, serverinfo);
             if (serverinfo != null) {
                 checkRoomIsRuning(serverinfo, roomId, function (isRuning) {
                     if (isRuning) {

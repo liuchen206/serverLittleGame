@@ -7,8 +7,34 @@ var userMgr = require('./usermgr');
 var io = null;
 exports.start = function (config, mgr) {
     io = require('socket.io')(config.CLIENT_PORT);
-
     io.sockets.on('connection', function (socket) {
+        //断开链接
+        socket.on('disconnect', function (data) {
+            var userId = socket.userId;
+            if (!userId) {
+                return;
+            }
+            var data = {
+                userid: userId,
+                online: false
+            };
+
+            //通知房间内其它玩家
+            userMgr.broacastInRoom('user_state_push', data, userId);
+
+            //清除玩家的在线信息
+            userMgr.del(userId);
+            socket.userId = null;
+        });
+
+        socket.on('game_ping', function (data) {
+            var userId = socket.userId;
+            if (!userId) {
+                return;
+            }
+            //console.log('game_ping');
+            socket.emit('game_pong');
+        });
         socket.on('login', function (data) {
             data = JSON.parse(data);
             if (socket.userId != null) {
@@ -20,11 +46,10 @@ exports.start = function (config, mgr) {
             var time = data.time;
             var sign = data.sign;
 
-            console.log(roomId);
-            console.log(token);
-            console.log(time);
-            console.log(sign);
-
+            console.log('login roomId', roomId);
+            console.log('login roomId', token);
+            console.log('login roomId', time);
+            console.log('login roomId', sign);
 
             //检查参数合法性
             if (token == null || roomId == null || sign == null || time == null) {
@@ -108,6 +133,8 @@ exports.start = function (config, mgr) {
 
             socket.emit('login_finished');
 
+            console.log("成功进入littlegame游戏房间", roomId);
+
             if (roomInfo.dr != null) {
                 var dr = roomInfo.dr;
                 var ramaingTime = (dr.endTime - Date.now()) / 1000;
@@ -118,16 +145,33 @@ exports.start = function (config, mgr) {
                 userMgr.sendMsg(userId, 'dissolve_notice_push', data);
             }
         });
-
-        socket.on('ready', function (data) {
+        //解散房间
+        socket.on('dispress', function (data) {
             var userId = socket.userId;
             if (userId == null) {
                 return;
             }
-            socket.gameMgr.setReady(userId);
-            userMgr.broacastInRoom('user_ready_push', { userid: userId, ready: true }, userId, true);
-        });
 
+            var roomId = roomMgr.getUserRoom(userId);
+            if (roomId == null) {
+                return;
+            }
+
+            //如果游戏已经开始，则不可以
+            if (socket.gameMgr.hasBegan(roomId)) {
+                return;
+            }
+
+            //如果不是房主，则不能解散房间
+            if (roomMgr.isCreator(roomId, userId) == false) {
+                return;
+            }
+
+            userMgr.broacastInRoom('dispress_push', {}, userId, true);
+            userMgr.kickAllInRoom(roomId);
+            roomMgr.destroy(roomId);
+            socket.disconnect();
+        });
         //退出房间
         socket.on('exit', function (data) {
             var userId = socket.userId;
@@ -160,151 +204,5 @@ exports.start = function (config, mgr) {
             socket.disconnect();
         });
 
-        //解散房间
-        socket.on('dispress', function (data) {
-            var userId = socket.userId;
-            if (userId == null) {
-                return;
-            }
-
-            var roomId = roomMgr.getUserRoom(userId);
-            if (roomId == null) {
-                return;
-            }
-
-            //如果游戏已经开始，则不可以
-            if (socket.gameMgr.hasBegan(roomId)) {
-                return;
-            }
-
-            //如果不是房主，则不能解散房间
-            if (roomMgr.isCreator(roomId, userId) == false) {
-                return;
-            }
-
-            userMgr.broacastInRoom('dispress_push', {}, userId, true);
-            userMgr.kickAllInRoom(roomId);
-            roomMgr.destroy(roomId);
-            socket.disconnect();
-        });
-
-        //解散房间
-        socket.on('dissolve_request', function (data) {
-            var userId = socket.userId;
-            console.log('dissolve_request', 1);
-            if (userId == null) {
-                console.log(2);
-                return;
-            }
-
-            var roomId = roomMgr.getUserRoom(userId);
-            if (roomId == null) {
-                console.log('dissolve_request', 3);
-                return;
-            }
-
-            //如果游戏未开始，则不可以
-            if (socket.gameMgr.hasBegan(roomId) == false) {
-                console.log('dissolve_request', 4);
-                return;
-            }
-
-            var ret = socket.gameMgr.dissolveRequest(roomId, userId);
-            if (ret != null) {
-                var dr = ret.dr;
-                var ramaingTime = (dr.endTime - Date.now()) / 1000;
-                var data = {
-                    time: ramaingTime,
-                    states: dr.states
-                }
-                console.log('dissolve_request', 5);
-                userMgr.broacastInRoom('dissolve_notice_push', data, userId, true);
-            }
-            console.log('dissolve_request', 6);
-        });
-
-        socket.on('dissolve_agree', function (data) {
-            var userId = socket.userId;
-
-            if (userId == null) {
-                return;
-            }
-
-            var roomId = roomMgr.getUserRoom(userId);
-            if (roomId == null) {
-                return;
-            }
-
-            var ret = socket.gameMgr.dissolveAgree(roomId, userId, true);
-            if (ret != null) {
-                var dr = ret.dr;
-                var ramaingTime = (dr.endTime - Date.now()) / 1000;
-                var data = {
-                    time: ramaingTime,
-                    states: dr.states
-                }
-                userMgr.broacastInRoom('dissolve_notice_push', data, userId, true);
-
-                var doAllAgree = true;
-                for (var i = 0; i < dr.states.length; ++i) {
-                    if (dr.states[i] == false) {
-                        doAllAgree = false;
-                        break;
-                    }
-                }
-
-                if (doAllAgree) {
-                    socket.gameMgr.doDissolve(roomId);
-                }
-            }
-        });
-
-        socket.on('dissolve_reject', function (data) {
-            var userId = socket.userId;
-
-            if (userId == null) {
-                return;
-            }
-
-            var roomId = roomMgr.getUserRoom(userId);
-            if (roomId == null) {
-                return;
-            }
-
-            var ret = socket.gameMgr.dissolveAgree(roomId, userId, false);
-            if (ret != null) {
-                userMgr.broacastInRoom('dissolve_cancel_push', {}, userId, true);
-            }
-        });
-
-        //断开链接
-        socket.on('disconnect', function (data) {
-            var userId = socket.userId;
-            if (!userId) {
-                return;
-            }
-            var data = {
-                userid: userId,
-                online: false
-            };
-
-            //通知房间内其它玩家
-            userMgr.broacastInRoom('user_state_push', data, userId);
-
-            //清除玩家的在线信息
-            userMgr.del(userId);
-            socket.userId = null;
-        });
-
-        socket.on('game_ping', function (data) {
-            var userId = socket.userId;
-            if (!userId) {
-                return;
-            }
-            //console.log('game_ping');
-            socket.emit('game_pong');
-        });
     });
-
-    console.log("game server is listening on " + config.CLIENT_PORT);
 };
