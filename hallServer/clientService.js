@@ -139,7 +139,6 @@ app.get('/create_private_room', function (req, res) {
         var userId = data.userid;
         var name = data.name;
         //验证玩家状态
-        console.log("验证玩家状态.");
         db.get_room_id_of_user(userId, function (roomId) {
             if (roomId != null) {
                 http.send(res, -1, "user is playing in room now.");
@@ -149,7 +148,6 @@ app.get('/create_private_room', function (req, res) {
             console.log("创建房间.", conf);
             room_service.createRoom(account, userId, conf, function (err, roomId) {
                 if (err == 0 && roomId != null) {
-                    console.log("创建房间,返回成功.");
                     room_service.enterRoom(userId, name, roomId, function (errcode, enterInfo) {
                         if (enterInfo) {
                             var ret = {

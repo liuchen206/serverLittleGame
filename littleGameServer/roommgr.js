@@ -1,5 +1,5 @@
 /**
- * 维护了所有房间信息
+ * 维护了所有房间信息，包括房间在哪房间配置，玩家座位及其所属房间
  */
 var db = require('../utils/db');
 
@@ -9,11 +9,9 @@ var creatingRooms = {};
 var userLocation = {};
 var totalRooms = 0;
 
-var DI_FEN = [1, 2, 5];
-var MAX_FAN = [3, 4, 5];
-var JU_SHU = [4, 8];
-var JU_SHU_COST = [2, 3];
-
+/**
+ * 生成一个房间id
+ */
 function generateRoomId() {
     var roomId = "";
     for (var i = 0; i < 6; ++i) {
@@ -21,6 +19,10 @@ function generateRoomId() {
     }
     return roomId;
 }
+/**
+ * 使用数据库的房间信息构建房间
+ * @param {数据库中的房间信息} dbdata 
+ */
 function constructRoomFromDb(dbdata) {
     var roomInfo = {
         uuid: dbdata.uuid,
@@ -33,7 +35,7 @@ function constructRoomFromDb(dbdata) {
     };
 
 
-    if (roomInfo.conf.type == "xlch") {
+    if (roomInfo.conf.type == "little_first") {
         roomInfo.gameMgr = require("./gamemgr_first");
     }
     else {
@@ -66,6 +68,9 @@ function constructRoomFromDb(dbdata) {
     totalRooms++;
     return roomInfo;
 }
+/**
+ * 返回玩家在房间内的座位号
+ */
 exports.getUserSeat = function (userId) {
     var location = userLocation[userId];
     //console.log(userLocation[userId]);
@@ -74,6 +79,9 @@ exports.getUserSeat = function (userId) {
     }
     return null;
 };
+/**
+ * 返回房间总数
+ */
 exports.getTotalRooms = function () {
     return totalRooms;
 }
@@ -82,54 +90,32 @@ exports.getUserLocations = function () {
 };
 exports.createRoom = function (creator, roomConf, gems, ip, port, callback) {
     if (roomConf.type == null
-        || roomConf.difen == null
-        || roomConf.zimo == null
-        || roomConf.jiangdui == null
-        || roomConf.huansanzhang == null
-        || roomConf.zuidafanshu == null
-        || roomConf.jushuxuanze == null
-        || roomConf.dianganghua == null
-        || roomConf.menqing == null
-        || roomConf.tiandihu == null) {
+        || roomConf.playerNum == null
+        || roomConf.playRound == null) {
         callback(1, null);
+        console.log("err：房间信息不完整");
         return;
     }
 
-    if (roomConf.difen < 0 || roomConf.difen > DI_FEN.length) {
+    if (roomConf.playerNum < 2) {
         callback(1, null);
+        console.log("err：玩家数量不合法");
         return;
     }
 
-    if (roomConf.zimo < 0 || roomConf.zimo > 2) {
+    if (roomConf.playRound < 1) {
         callback(1, null);
+        console.log("err：游戏局数不合法");
         return;
     }
-
-    if (roomConf.zuidafanshu < 0 || roomConf.zuidafanshu > MAX_FAN.length) {
-        callback(1, null);
-        return;
-    }
-
-    if (roomConf.jushuxuanze < 0 || roomConf.jushuxuanze > JU_SHU.length) {
-        callback(1, null);
-        return;
-    }
-
-    var cost = JU_SHU_COST[roomConf.jushuxuanze];
-    if (cost > gems) {
-        callback(2222, null);
-        return;
-    }
-
     var fnCreate = function () {
         var roomId = generateRoomId();
         if (rooms[roomId] != null || creatingRooms[roomId] != null) {
             fnCreate();
         }
         else {
-            creatingRooms[roomId] = true;
+            creatingRooms[roomId] = true; // 房间号正在被占用
             db.is_room_exist(roomId, function (ret) {
-
                 if (ret) {
                     delete creatingRooms[roomId];
                     fnCreate();
@@ -139,33 +125,29 @@ exports.createRoom = function (creator, roomConf, gems, ip, port, callback) {
                     var roomInfo = {
                         uuid: "",
                         id: roomId,
-                        numOfGames: 0,
+                        playerNum: 0,
                         createTime: createTime,
                         nextButton: 0,
+                        numOfGames: 0,
                         seats: [],
                         conf: {
                             type: roomConf.type,
-                            baseScore: DI_FEN[roomConf.difen],
-                            zimo: roomConf.zimo,
-                            jiangdui: roomConf.jiangdui,
-                            hsz: roomConf.huansanzhang,
-                            dianganghua: parseInt(roomConf.dianganghua),
-                            menqing: roomConf.menqing,
-                            tiandihu: roomConf.tiandihu,
-                            maxFan: MAX_FAN[roomConf.zuidafanshu],
-                            maxGames: JU_SHU[roomConf.jushuxuanze],
+                            playerNum: roomConf.playerNum,
+                            playRound: roomConf.playRound,
+                            maxGames: roomConf.jushuxuanze,
                             creator: creator,
                         }
                     };
 
-                    if (roomConf.type == "xlch") {
+                    // 选择游戏管理器，表明游戏玩法
+                    if (roomConf.type == "little_first") {
                         roomInfo.gameMgr = require("./gamemgr_first");
                     }
                     else {
                         roomInfo.gameMgr = require("./gamemgr_first");
                     }
                     console.log(roomInfo.conf);
-
+                    // 初始化房间座位
                     for (var i = 0; i < 4; ++i) {
                         roomInfo.seats.push({
                             userId: 0,
@@ -173,24 +155,17 @@ exports.createRoom = function (creator, roomConf, gems, ip, port, callback) {
                             name: "",
                             ready: false,
                             seatIndex: i,
-                            numZiMo: 0,
-                            numJiePao: 0,
-                            numDianPao: 0,
-                            numAnGang: 0,
-                            numMingGang: 0,
-                            numChaJiao: 0,
                         });
                     }
-
 
                     //写入数据库
                     var conf = roomInfo.conf;
                     db.create_room(roomInfo.id, roomInfo.conf, ip, port, createTime, function (uuid) {
-                        delete creatingRooms[roomId];
+                        delete creatingRooms[roomId]; // 解除占用
                         if (uuid != null) {
                             roomInfo.uuid = uuid;
                             console.log(uuid);
-                            rooms[roomId] = roomInfo;
+                            rooms[roomId] = roomInfo; // 将房间放入管理数组，以备选择
                             totalRooms++;
                             callback(0, roomId);
                         }
@@ -203,16 +178,18 @@ exports.createRoom = function (creator, roomConf, gems, ip, port, callback) {
         }
     }
 
-    fnCreate();
+    fnCreate(); // 执行直至有了结果
 };
-
+/**
+ * 进入房间
+ */
 exports.enterRoom = function (roomId, userId, userName, callback) {
     var fnTakeSeat = function (room) {
         if (exports.getUserRoom(userId) == roomId) {
             //已存在
             return 0;
         }
-
+        // 按从小到大的次序给一个位置坐下
         for (var i = 0; i < 4; ++i) {
             var seat = room.seats[i];
             if (seat.userId <= 0) {
@@ -231,6 +208,7 @@ exports.enterRoom = function (roomId, userId, userName, callback) {
         //房间已满
         return 1;
     }
+    // 找一个房间让玩家坐下
     var room = rooms[roomId];
     if (room) {
         var ret = fnTakeSeat(room);
@@ -252,10 +230,16 @@ exports.enterRoom = function (roomId, userId, userName, callback) {
         });
     }
 };
+/**
+ * 返回房间信息
+ */
 exports.getRoom = function (roomId) {
     return rooms[roomId];
 };
 
+/**
+ * 返回坐下的玩家的房间号
+ */
 exports.getUserRoom = function (userId) {
     var location = userLocation[userId];
     if (location != null) {
@@ -270,6 +254,9 @@ exports.isCreator = function (roomId, userId) {
     }
     return roomInfo.conf.creator == userId;
 };
+/**
+ * 销毁房间，包括房间信息rooms，座位信息userLocation，数据库房间号数据和单个玩家房间号信息
+ */
 exports.destroy = function (roomId) {
     var roomInfo = rooms[roomId];
     if (roomInfo == null) {
@@ -288,33 +275,36 @@ exports.destroy = function (roomId) {
     totalRooms--;
     db.delete_room(roomId);
 };
-exports.exitRoom = function(userId){
-	var location = userLocation[userId];
-	if(location == null)
-		return;
+/**
+ * 单个玩家退出房间
+ */
+exports.exitRoom = function (userId) {
+    var location = userLocation[userId];
+    if (location == null)
+        return;
 
-	var roomId = location.roomId;
-	var seatIndex = location.seatIndex;
-	var room = rooms[roomId];
-	delete userLocation[userId];
-	if(room == null || seatIndex == null) {
-		return;
-	}
+    var roomId = location.roomId;
+    var seatIndex = location.seatIndex;
+    var room = rooms[roomId];
+    delete userLocation[userId];
+    if (room == null || seatIndex == null) {
+        return;
+    }
 
-	var seat = room.seats[seatIndex];
-	seat.userId = 0;
-	seat.name = "";
+    var seat = room.seats[seatIndex];
+    seat.userId = 0;
+    seat.name = "";
 
-	var numOfPlayers = 0;
-	for(var i = 0; i < room.seats.length; ++i){
-		if(room.seats[i].userId > 0){
-			numOfPlayers++;
-		}
-	}
-	
-	db.set_room_id_of_user(userId,null);
+    var numOfPlayers = 0;
+    for (var i = 0; i < room.seats.length; ++i) {
+        if (room.seats[i].userId > 0) {
+            numOfPlayers++;
+        }
+    }
 
-	if(numOfPlayers == 0){
-		exports.destroy(roomId);
-	}
+    db.set_room_id_of_user(userId, null);
+
+    if (numOfPlayers == 0) {
+        exports.destroy(roomId);
+    }
 };

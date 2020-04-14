@@ -89,11 +89,12 @@ exports.start = function (config, mgr) {
             var ret = {
                 errcode: 0,
                 errmsg: "ok",
+                serverType: config.serverType,
                 data: {
                     roomid: roomInfo.id,
                     conf: roomInfo.conf,
                     numofgames: roomInfo.numOfGames,
-                    seats: seats
+                    seats: seats,
                 }
             };
             socket.emit('login_result', ret);
@@ -106,7 +107,7 @@ exports.start = function (config, mgr) {
             //玩家上线，强制设置为TRUE
             // socket.gameMgr.setReady(userId); // liuchen do it;
 
-            socket.emit('login_finished');
+            socket.emit('login_finished', { gameType: config.serverType });
 
             if (roomInfo.dr != null) {
                 var dr = roomInfo.dr;

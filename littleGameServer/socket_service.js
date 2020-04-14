@@ -8,7 +8,7 @@ var io = null;
 exports.start = function (config, mgr) {
     io = require('socket.io')(config.CLIENT_PORT);
     io.sockets.on('connection', function (socket) {
-        //断开链接
+        //断开链接,即掉线
         socket.on('disconnect', function (data) {
             var userId = socket.userId;
             if (!userId) {
@@ -26,7 +26,7 @@ exports.start = function (config, mgr) {
             userMgr.del(userId);
             socket.userId = null;
         });
-
+        //接收客户端的心跳
         socket.on('game_ping', function (data) {
             var userId = socket.userId;
             if (!userId) {
@@ -35,6 +35,7 @@ exports.start = function (config, mgr) {
             //console.log('game_ping');
             socket.emit('game_pong');
         });
+        //接受客户端的登录，同时同步房间信息
         socket.on('login', function (data) {
             data = JSON.parse(data);
             if (socket.userId != null) {
@@ -114,6 +115,7 @@ exports.start = function (config, mgr) {
             var ret = {
                 errcode: 0,
                 errmsg: "ok",
+                serverType: config.serverType,
                 data: {
                     roomid: roomInfo.id,
                     conf: roomInfo.conf,
@@ -129,9 +131,9 @@ exports.start = function (config, mgr) {
             socket.gameMgr = roomInfo.gameMgr;
 
             //玩家上线，强制设置为TRUE
-            // socket.gameMgr.setReady(userId); // liuchen do it;
+            socket.gameMgr.setReady(userId);
 
-            socket.emit('login_finished');
+            socket.emit('login_finished', { gameType: config.serverType });
 
             console.log("成功进入littlegame游戏房间", roomId);
 
@@ -145,7 +147,7 @@ exports.start = function (config, mgr) {
                 userMgr.sendMsg(userId, 'dissolve_notice_push', data);
             }
         });
-        //解散房间
+        //解散房间，在游戏未开始阶段，房主可以通过此消息立即解散房间，不需要其他玩家同意
         socket.on('dispress', function (data) {
             var userId = socket.userId;
             if (userId == null) {
@@ -172,7 +174,7 @@ exports.start = function (config, mgr) {
             roomMgr.destroy(roomId);
             socket.disconnect();
         });
-        //退出房间
+        //退出房间，游戏未开始时，非房主通过此消息退出房间
         socket.on('exit', function (data) {
             var userId = socket.userId;
             if (userId == null) {
