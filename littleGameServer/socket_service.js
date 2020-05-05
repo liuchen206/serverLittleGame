@@ -8,6 +8,9 @@ var io = null;
 exports.start = function (config, mgr) {
     io = require('socket.io')(config.CLIENT_PORT);
     io.sockets.on('connection', function (socket) {
+        /**
+         * -------------------房间通用消息 start----------------------
+         */
         //断开链接,即掉线
         socket.on('disconnect', function (data) {
             var userId = socket.userId;
@@ -131,9 +134,9 @@ exports.start = function (config, mgr) {
             socket.gameMgr = roomInfo.gameMgr;
 
             //玩家上线，强制设置为TRUE
-            socket.gameMgr.setReady(userId);
+            socket.gameMgr.setReady(userId, null);
 
-            socket.emit('login_finished', { gameType: config.serverType });
+            socket.emit('login_finished', { serverType: config.serverType });
 
             console.log("成功进入littlegame游戏房间", roomId);
 
@@ -151,21 +154,25 @@ exports.start = function (config, mgr) {
         socket.on('dispress', function (data) {
             var userId = socket.userId;
             if (userId == null) {
+                console.log('找不到玩家，无法解散');
                 return;
             }
 
             var roomId = roomMgr.getUserRoom(userId);
             if (roomId == null) {
+                console.log('找不到房间号，无法解散');
                 return;
             }
 
             //如果游戏已经开始，则不可以
             if (socket.gameMgr.hasBegan(roomId)) {
+                console.log('游戏已经开始，请使用 dissolve_request 请所有人投票解散房间');
                 return;
             }
 
             //如果不是房主，则不能解散房间
             if (roomMgr.isCreator(roomId, userId) == false) {
+                console.log('不是房主，无法解散');
                 return;
             }
 
@@ -178,21 +185,25 @@ exports.start = function (config, mgr) {
         socket.on('exit', function (data) {
             var userId = socket.userId;
             if (userId == null) {
+                console.log('找不到玩家id，无法退出房间');
                 return;
             }
 
             var roomId = roomMgr.getUserRoom(userId);
             if (roomId == null) {
+                console.log('找不到房间id，无法退出房间');
                 return;
             }
 
             //如果游戏已经开始，则不可以
             if (socket.gameMgr.hasBegan(roomId)) {
+                console.log('游戏已经开始，请使用dissolve_request 请所有人投票解散房间，无法退出房间');
                 return;
             }
 
             //如果是房主，则只能走解散房间
             if (roomMgr.isCreator(userId)) {
+                console.log('不是房主，无法退出房间');
                 return;
             }
 
@@ -205,6 +216,103 @@ exports.start = function (config, mgr) {
             socket.emit('exit_result');
             socket.disconnect();
         });
+        //游戏中 解散房间
+        socket.on('dissolve_request', function (data) {
+            var userId = socket.userId;
+            if (userId == null) {
+                console.log('找不到玩家id，无法在游戏中解散房间');
+                return;
+            }
 
+            var roomId = roomMgr.getUserRoom(userId);
+            if (roomId == null) {
+                console.log('找不到房间id，无法在游戏中解散房间');
+                return;
+            }
+
+            //如果游戏未开始，则不可以
+            if (socket.gameMgr.hasBegan(roomId) == false) {
+                console.log('游戏没有开始，请使用 dispress 解散房间');
+                return;
+            }
+
+            var ret = socket.gameMgr.dissolveRequest(roomId, userId);
+            if (ret != null) {
+                var dr = ret.dr;
+                var ramaingTime = (dr.endTime - Date.now()) / 1000;
+                var data = {
+                    time: ramaingTime,
+                    states: dr.states
+                }
+                console.log('广播 解散房间');
+                userMgr.broacastInRoom('dissolve_notice_push', data, userId, true);
+            } else {
+                console.log('房间解散，游戏返回结果失败');
+            }
+        });
+        // 同意 游戏中解散房间
+        socket.on('dissolve_agree', function (data) {
+            var userId = socket.userId;
+
+            if (userId == null) {
+                return;
+            }
+
+            var roomId = roomMgr.getUserRoom(userId);
+            if (roomId == null) {
+                return;
+            }
+
+            var ret = socket.gameMgr.dissolveAgree(roomId, userId, true);
+            if (ret != null) {
+                var dr = ret.dr;
+                var ramaingTime = (dr.endTime - Date.now()) / 1000;
+                var data = {
+                    time: ramaingTime,
+                    states: dr.states
+                }
+                userMgr.broacastInRoom('dissolve_notice_push', data, userId, true);
+
+                var doAllAgree = true;
+                for (var i = 0; i < dr.states.length; ++i) {
+                    if (dr.states[i] == false) {
+                        doAllAgree = false;
+                        break;
+                    }
+                }
+
+                if (doAllAgree) {
+                    socket.gameMgr.doDissolve(roomId);
+                }
+            }
+        });
+        // 拒绝 游戏中解散房间
+        socket.on('dissolve_reject', function (data) {
+            var userId = socket.userId;
+
+            if (userId == null) {
+                return;
+            }
+
+            var roomId = roomMgr.getUserRoom(userId);
+            if (roomId == null) {
+                return;
+            }
+
+            var ret = socket.gameMgr.dissolveAgree(roomId, userId, false);
+            if (ret != null) {
+                userMgr.broacastInRoom('dissolve_cancel_push', {}, userId, true);
+            }
+        });
+        /**
+         * -------------------房间通用消息 end----------------------
+         */
+
+        /**
+         * -------------------游戏逻辑消息 start----------------------
+         */
+        /**
+         * -------------------游戏逻辑消息 end----------------------
+         */
     });
 };

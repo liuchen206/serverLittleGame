@@ -9,6 +9,9 @@ exports.start = function (config, mgr) {
     io = require('socket.io')(config.CLIENT_PORT);
 
     io.sockets.on('connection', function (socket) {
+        /**
+         * -------------------房间通用消息 start----------------------
+         */
         socket.on('login', function (data) {
             data = JSON.parse(data);
             if (socket.userId != null) {
@@ -105,9 +108,9 @@ exports.start = function (config, mgr) {
             socket.gameMgr = roomInfo.gameMgr;
 
             //玩家上线，强制设置为TRUE
-            // socket.gameMgr.setReady(userId); // liuchen do it;
+            socket.gameMgr.setReady(userId);
 
-            socket.emit('login_finished', { gameType: config.serverType });
+            socket.emit('login_finished', { serverType: config.serverType });
 
             if (roomInfo.dr != null) {
                 var dr = roomInfo.dr;
@@ -192,21 +195,21 @@ exports.start = function (config, mgr) {
         //解散房间
         socket.on('dissolve_request', function (data) {
             var userId = socket.userId;
-            console.log('dissolve_request', 1);
+            console.log('dissolve_request', 'step1');
             if (userId == null) {
-                console.log(2);
+                console.log('dissolve_request', 's2');
                 return;
             }
 
             var roomId = roomMgr.getUserRoom(userId);
             if (roomId == null) {
-                console.log('dissolve_request', 3);
+                console.log('dissolve_request', 's3');
                 return;
             }
 
             //如果游戏未开始，则不可以
             if (socket.gameMgr.hasBegan(roomId) == false) {
-                console.log('dissolve_request', 4);
+                console.log('dissolve_request', 's4');
                 return;
             }
 
@@ -218,12 +221,12 @@ exports.start = function (config, mgr) {
                     time: ramaingTime,
                     states: dr.states
                 }
-                console.log('dissolve_request', 5);
+                console.log('dissolve_request', 's5');
                 userMgr.broacastInRoom('dissolve_notice_push', data, userId, true);
             }
-            console.log('dissolve_request', 6);
+            console.log('dissolve_request', 's6');
         });
-
+        // 同意 游戏中解散房间
         socket.on('dissolve_agree', function (data) {
             var userId = socket.userId;
 
@@ -305,6 +308,33 @@ exports.start = function (config, mgr) {
             //console.log('game_ping');
             socket.emit('game_pong');
         });
+        /**
+         * ---------------------房间通用消息 end--------------------
+         */
+
+        /**
+         * ----------------------------麻将游戏消息 start---------------
+         */
+        //定缺
+        socket.on('dingque', function (data) {
+            if (socket.userId == null) {
+                return;
+            }
+            var que = data;
+            socket.gameMgr.dingQue(socket.userId, que);
+        });
+        //出牌
+        socket.on('chupai', function (data) {
+            if (socket.userId == null) {
+                return;
+            }
+            var pai = data;
+            socket.gameMgr.chuPai(socket.userId, pai);
+        });
+
+        /**
+         * --------------------麻将游戏消息 end-------------------
+         */
     });
 
     console.log("game server is listening on " + config.CLIENT_PORT);
