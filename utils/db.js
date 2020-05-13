@@ -139,7 +139,74 @@ exports.get_gems = function (account, callback) {
         callback(rows[0]);
     });
 };
+exports.update_user_history = function (userId, history, callback) {
+    callback = callback == null ? nop : callback;
+    if (userId == null || history == null) {
+        callback(false);
+        return;
+    }
 
+    history = JSON.stringify(history);
+    var sql = 'UPDATE t_users SET roomid = null, history = \'' + history + '\' WHERE userid = "' + userId + '"';
+    //console.log(sql);
+    query(sql, function (err, rows, fields) {
+        if (err) {
+            callback(false);
+            throw err;
+        }
+
+        if (rows.length == 0) {
+            callback(false);
+            return;
+        }
+
+        callback(true);
+    });
+};
+exports.create_game = function (room_uuid, index, base_info, callback) {
+    callback = callback == null ? nop : callback;
+    var sql = "INSERT INTO t_games(room_uuid,game_index,base_info,create_time) VALUES('{0}',{1},'{2}',unix_timestamp(now()))";
+    sql = sql.format(room_uuid, index, base_info);
+    //console.log(sql);
+    query(sql, function (err, rows, fields) {
+        if (err) {
+            callback(null);
+            throw err;
+        }
+        else {
+            callback(rows.insertId);
+        }
+    });
+};
+exports.get_user_history = function (userId, callback) {
+    callback = callback == null ? nop : callback;
+    if (userId == null) {
+        callback(null);
+        return;
+    }
+
+    var sql = 'SELECT history FROM t_users WHERE userid = "' + userId + '"';
+    query(sql, function (err, rows, fields) {
+        if (err) {
+            callback(null);
+            throw err;
+        }
+
+        if (rows.length == 0) {
+            callback(null);
+            return;
+        }
+        var history = rows[0].history;
+        if (history == null || history == "") {
+            callback(null);
+        }
+        else {
+            console.log(history.length);
+            history = JSON.parse(history);
+            callback(history);
+        }
+    });
+};
 exports.create_room = function (roomId, conf, ip, port, create_time, callback) {
     callback = callback == null ? nop : callback;
     var sql = "INSERT INTO t_rooms(uuid,id,base_info,ip,port,create_time) \

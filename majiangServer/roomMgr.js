@@ -1,6 +1,43 @@
 var db = require('../utils/db');
 
-var rooms = {};
+// 座位上的玩家信息
+// seats = {
+//     userId: 0, // 玩家id
+//     score: 0,// 当前的积分
+//     name: "",
+//     ready: false,
+//     seatIndex: i,
+//     numZiMo: 0,
+//     numJiePao: 0,
+//     numDianPao: 0,
+//     numAnGang: 0,
+//     numMingGang: 0,
+//     numChaJiao: 0,
+// });
+
+// var roomInfo = {
+//     uuid: "", // 写入数据库时生成的id，==Date.now() + roomId;
+//     id: roomId, // 房间id
+//     numOfGames: 0,// 总共进行的局数
+//     createTime: createTime, // 创建房间的时间
+//     nextButton: 0,// 下局的庄家（计算方法由游戏计算，比如谁胡牌谁庄家，一局结束下家做庄家）
+//     seats: [],//桌上的座位信息-数组，最多四个。根据配置的开局人数，按需设置
+//     conf: { //本房间的游戏设置
+//         type: roomConf.type,
+//         baseScore: DI_FEN[roomConf.difen],
+//         zimo: roomConf.zimo,
+//         jiangdui: roomConf.jiangdui,
+//         hsz: roomConf.huansanzhang,
+//         dianganghua: parseInt(roomConf.dianganghua),
+//         menqing: roomConf.menqing,
+//         tiandihu: roomConf.tiandihu,
+//         maxFan: MAX_FAN[roomConf.zuidafanshu],
+//         maxGames: JU_SHU[roomConf.jushuxuanze],
+//         creator: creator,
+//         playerNum: roomConf.playerNum, // 开始游戏的玩家数量
+//     }
+// };
+var rooms = {}; // key = roomId;value=roomInfo
 var creatingRooms = {};
 
 var userLocation = {};
@@ -37,7 +74,7 @@ function generateRoomId() {
                 roomId += luckyNum;
             } else if (i >= 2 && i < 4) {
                 roomId += luckyNum2;
-            }else{
+            } else {
                 roomId += luckyNum3;
             }
         }
